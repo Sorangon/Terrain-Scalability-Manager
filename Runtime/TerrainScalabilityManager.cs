@@ -19,7 +19,7 @@ namespace TSM.Runtime {
         #endregion
 
         #region Currents
-        private static Dictionary<TerrainData, TerrainData> backedTerrainDatas = new Dictionary<TerrainData, TerrainData>();
+        private static Dictionary<TerrainData, TerrainData> m_backedTerrainDatas = new Dictionary<TerrainData, TerrainData>();
         #endregion
 
         #region Callbacks
@@ -33,7 +33,7 @@ namespace TSM.Runtime {
                     if (targetSetting == null) continue;
 
                     TerrainData backedData = null;
-                    foreach (var btd in backedTerrainDatas) {
+                    foreach (var btd in m_backedTerrainDatas) {
                         if(tsm.m_TargetTerrain.terrainData == btd.Key) {
                             backedData = btd.Value;
                         }
@@ -51,7 +51,7 @@ namespace TSM.Runtime {
                             string newAssetPath = sourceAssetPath.Substring(0, sourceAssetPath.Length - 6) + suffix + ".asset";
                             AssetDatabase.CreateAsset(backedData, newAssetPath);
                             AssetDatabase.ImportAsset(newAssetPath);
-                            backedTerrainDatas.Add(sourceData, backedData);
+                            m_backedTerrainDatas.Add(sourceData, backedData);
                             tsm.ApplyTerrainDataScalability(backedData, targetSetting);
                         }
 
