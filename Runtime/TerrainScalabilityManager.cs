@@ -13,93 +13,131 @@ namespace TSM.Runtime {
     [RequireComponent(typeof(Terrain))]
     public class TerrainScalabilityManager : MonoBehaviour {
 #if UNITY_EDITOR
-        [PostProcessScene]
-        public static void OnPostProcessScene() {
-            if (BuildPipeline.isBuildingPlayer) {
-                foreach (var tsm in FindObjectsOfType<TerrainScalabilityManager>()) {
-                    tsm.ApplyScalability();
-                }
-            }
-        }
-
         #region Settings
         [SerializeField, HideInInspector] private Terrain m_TargetTerrain = null;
         [SerializeField] private TerrainScalabilitySetting[] m_ScalabilitySetting = { };
         #endregion
 
+        #region Currents
+        private static Dictionary<TerrainData, TerrainData> backedTerrainDatas = new Dictionary<TerrainData, TerrainData>();
+        #endregion
+
         #region Callbacks
+        [PostProcessScene]
+        public static void OnPostProcessScene() {
+            if (BuildPipeline.isBuildingPlayer) {
+                foreach (var tsm in FindObjectsOfType<TerrainScalabilityManager>()) {
+                    if (tsm.m_TargetTerrain == null) continue;
+
+                    TerrainScalabilitySetting targetSetting = tsm.GetPlatformSetting();
+                    if (targetSetting == null) continue;
+
+                    TerrainData backedData = null;
+                    foreach (var btd in backedTerrainDatas) {
+                        if(tsm.m_TargetTerrain.terrainData == btd.Key) {
+                            backedData = btd.Value;
+                        }
+                    }
+
+                    if (backedData == null) {
+                        TerrainData sourceData = tsm.m_TargetTerrain.terrainData;
+                        backedData = Instantiate(sourceData);
+                        string suffix = "_Backed_" + EditorUserBuildSettings.activeBuildTarget;
+                        backedData.name += suffix;
+
+                        //Create terrain data asset
+                        if (AssetDatabase.Contains(sourceData)) {
+                            string sourceAssetPath = AssetDatabase.GetAssetPath(sourceData);
+                            string newAssetPath = sourceAssetPath.Substring(0, sourceAssetPath.Length - 6) + suffix + ".asset";
+                            AssetDatabase.CreateAsset(backedData, newAssetPath);
+                            AssetDatabase.ImportAsset(newAssetPath);
+                            backedTerrainDatas.Add(sourceData, backedData);
+                            tsm.ApplyTerrainDataScalability(backedData, targetSetting);
+                        }
+
+                        tsm.m_TargetTerrain.terrainData = backedData;
+                        tsm.ApplyTerrainScalability(targetSetting);
+                    }
+                }
+            }
+        }
+
         private void Reset() {
             m_TargetTerrain = GetComponent<Terrain>();
         }
 
         private void Start() {
-            m_TargetTerrain.terrainData = Instantiate(m_TargetTerrain.terrainData);
-            ApplyScalability(); 
+            TerrainScalabilitySetting targetSetting = GetPlatformSetting();
+
+            if (targetSetting != null) {
+                m_TargetTerrain.terrainData = Instantiate(m_TargetTerrain.terrainData);
+
+                ApplyTerrainDataScalability(m_TargetTerrain.terrainData, targetSetting);
+                ApplyTerrainScalability(targetSetting); 
+            }
         }
         #endregion
 
         #region Apply
-        private void ApplyScalability() {
-            BuildTarget currentTarget = EditorUserBuildSettings.activeBuildTarget;
-            foreach (var setting in m_ScalabilitySetting) {
-                bool isTarget = false;
+        private void ApplyTerrainDataScalability(TerrainData targetData, TerrainScalabilitySetting setting) {
+            targetData.baseMapResolution = (int)setting.overrideBaseTextureRes;
+            targetData.SetBaseMapDirty();
 
-                foreach (var target in setting.buildTargets) {
-                    if(target == currentTarget) {
-                        isTarget = true;
-                        break;
-                    }
-                }
+            if ((int)setting.overrideControlTextureRes < targetData.alphamapResolution) {
+                float[,,] sourceAlphamap = targetData.GetAlphamaps(0, 0, targetData.alphamapResolution, targetData.alphamapResolution);
+                int targetRes = (int)setting.overrideControlTextureRes;
+                int divideRatio = targetData.alphamapResolution / targetRes;
 
-                if(setting.overridenPixelError >= 0f) {
-                    m_TargetTerrain.heightmapPixelError = setting.overridenPixelError;
-                }
-
-                if(setting.overridenBaseMapDist >= 0f) {
-                    m_TargetTerrain.basemapDistance = setting.overridenBaseMapDist;
-                }
-
-                TerrainData targetData = m_TargetTerrain.terrainData;
-
-                targetData.baseMapResolution = (int)setting.overrideBaseTextureRes;
-                targetData.SetBaseMapDirty();
-
-                if((int)setting.overrideControlTextureRes < targetData.alphamapResolution) {
-                    float[,,] sourceAlphamap = targetData.GetAlphamaps(0, 0, targetData.alphamapResolution, targetData.alphamapResolution);
-                    int targetRes = (int)setting.overrideControlTextureRes;
-                    int divideRatio = targetData.alphamapResolution / targetRes;
-
-                    float[,,] newAlphaMap = new float[targetRes, targetRes, sourceAlphamap.GetLength(2)];
-                    for (int i = 0; i < targetRes; i++) {
-                        for (int j = 0; j < targetRes; j++) {
-                            int coll = i * divideRatio;
-                            int row = j * divideRatio;
-                            for (int k = 0; k < sourceAlphamap.GetLength(2); k++) {
-                                newAlphaMap[i, j, k] = sourceAlphamap[coll, row, k];
-                            }
+                float[,,] newAlphaMap = new float[targetRes, targetRes, sourceAlphamap.GetLength(2)];
+                for (int i = 0; i < targetRes; i++) {
+                    for (int j = 0; j < targetRes; j++) {
+                        int coll = i * divideRatio;
+                        int row = j * divideRatio;
+                        for (int k = 0; k < sourceAlphamap.GetLength(2); k++) {
+                            newAlphaMap[i, j, k] = sourceAlphamap[coll, row, k];
                         }
                     }
-
-                    targetData.alphamapResolution = targetRes;
-                    targetData.SetAlphamaps(0, 0, newAlphaMap);
-                } else {
-                    Debug.LogWarning("[Terrrain Scalability Manager] The control texture override value is higher or equal than the base one, update it is not required");
                 }
 
-                ManageTreesDensity(setting);
+                targetData.alphamapResolution = targetRes;
+                targetData.SetAlphamaps(0, 0, newAlphaMap);
+            } else {
+                Debug.LogWarning("[Terrrain Scalability Manager] The control texture override value is higher or equal than the base one, update it is not required");
+            }
 
-                if (isTarget) {
-                    break;
-                }
+            ManageTreesDensity(setting, targetData);
+        }
+
+        private void ApplyTerrainScalability(TerrainScalabilitySetting setting) {
+            if (setting.overridenPixelError >= 0f) {
+                m_TargetTerrain.heightmapPixelError = setting.overridenPixelError;
+            }
+
+            if (setting.overridenBaseMapDist >= 0f) {
+                m_TargetTerrain.basemapDistance = setting.overridenBaseMapDist;
             }
         } 
+
+        private TerrainScalabilitySetting GetPlatformSetting() {
+            BuildTarget currentTarget = EditorUserBuildSettings.activeBuildTarget;
+            foreach (var setting in m_ScalabilitySetting) {
+                foreach (var target in setting.buildTargets) {
+                    if (target == currentTarget) {
+                        return setting;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>
         /// Removes trees depending trees scalability settings
         /// </summary>
         /// <param name="scalabilitySetting"></param>
-        private void ManageTreesDensity(TerrainScalabilitySetting scalabilitySetting) {
+        private void ManageTreesDensity(TerrainScalabilitySetting scalabilitySetting, TerrainData terrainData) {
             List<TreeInstance> remainingInstances = new List<TreeInstance>();
-            TreeInstance[] treeInstances = m_TargetTerrain.terrainData.treeInstances;
+            TreeInstance[] treeInstances = terrainData.treeInstances;
 
             for (int i = 0; i < treeInstances.Length; i++) {
                 TreeInstance ti = treeInstances[i];
@@ -123,7 +161,7 @@ namespace TSM.Runtime {
                 }
             }
 
-            m_TargetTerrain.terrainData.treeInstances = remainingInstances.ToArray();
+            terrainData.treeInstances = remainingInstances.ToArray();
         }
         #endregion
 
