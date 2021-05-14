@@ -1,0 +1,16 @@
+{
+  "name": "com.soratools.terrainscalabilitymanager",
+  "displayName": "Terrain Scalability Manager",
+  "version": "0.0.0",
+  "unity": "2020.3",
+  "keywords": [
+    "tools",
+    "environment"
+  ],
+  "description": "Optimize your terrains for all your target platforms",
+  "repository": {
+    "url": "https://github.com/Sorangon/Terrain-Scalability-Manager.git",
+    "type": "git"
+  },
+  "type": "tool"
+}
