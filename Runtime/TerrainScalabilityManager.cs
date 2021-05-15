@@ -58,7 +58,6 @@ namespace TSM.Runtime {
 
             if (targetSetting != null) {
                 SetTerrainData(GetScaledTerrainData(out bool alreadyInDatabase));
-
                 ApplyTerrainDataScalability(m_TargetTerrain.terrainData, targetSetting);
                 ApplyTerrainScalability(targetSetting); 
             }
@@ -102,6 +101,26 @@ namespace TSM.Runtime {
 
             if (setting.overridenBaseMapDist >= 0f) {
                 m_TargetTerrain.basemapDistance = setting.overridenBaseMapDist;
+            }
+
+            if(setting.overrideDetailDistance >= 0f) {
+                m_TargetTerrain.detailObjectDistance = setting.overrideDetailDistance;
+            }
+
+            if (setting.overrideDetailDensity >= 0f) {
+                m_TargetTerrain.detailObjectDensity = setting.overrideDetailDensity;
+            }
+
+            if (setting.overrideTreeDistance >= 0f) {
+                m_TargetTerrain.treeDistance = setting.overrideTreeDistance;
+            }
+
+            if (setting.overrideBillboardStart >= 0f) {
+                m_TargetTerrain.treeBillboardDistance = setting.overrideBillboardStart;
+            }
+
+            if (setting.overrideFadeLength >= 0f) {
+                m_TargetTerrain.treeCrossFadeLength = setting.overrideFadeLength;
             }
         } 
 

@@ -21,6 +21,13 @@ namespace TSM.Runtime {
         [SerializeField, TerrainOverrideFloatProperty("basemapDistance", false, 0f, 20000f)] internal float overridenBaseMapDist = -1f;
         [SerializeField] internal ShadowCastingMode overrideShadowCastingMode = (ShadowCastingMode)(-1);
 
+        [Header("Trees and Details")]
+        [SerializeField, TerrainOverrideFloatProperty("detailObjectDistance", false, 0f, 250)] internal float overrideDetailDistance = -1f;
+        [SerializeField, TerrainOverrideFloatProperty("detailObjectDensity", false, 0f, 1f)] internal float overrideDetailDensity = -1f;
+        [SerializeField, TerrainOverrideFloatProperty("treeDistance", false, 0f, 5000f)] internal float overrideTreeDistance = -1f;
+        [SerializeField, TerrainOverrideFloatProperty("treeBillboardDistance", false, 5f, 2000f)] internal float overrideBillboardStart = -1f;
+        [SerializeField, TerrainOverrideFloatProperty("treeCrossFadeLength", false, 0f, 200f)] internal float overrideFadeLength = -1f;
+
         [Header("Textures")]
         [SerializeField] internal TextureResolution overrideControlTextureRes = TextureResolution._1024;
         [SerializeField] internal TextureResolution overrideBaseTextureRes = TextureResolution._1024;
