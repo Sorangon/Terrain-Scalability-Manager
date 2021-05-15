@@ -1,7 +1,7 @@
 {
   "name": "com.soratools.terrainscalabilitymanager",
   "displayName": "Terrain Scalability Manager",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "unity": "2020.3",
   "keywords": [
     "tools",
@@ -11,6 +11,5 @@
   "repository": {
     "url": "https://github.com/Sorangon/Terrain-Scalability-Manager.git",
     "type": "git"
-  },
-  "type": "tool"
+  }
 }
