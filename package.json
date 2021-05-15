@@ -10,6 +10,7 @@
   "description": "Optimize your terrains for all your target platforms",
   "repository": {
     "url": "https://github.com/Sorangon/Terrain-Scalability-Manager.git",
-    "type": "git"
+    "type": "git",
+    "revision": "fd84bea189e4dc5ba03e395a2713b7ff4a1079b3"
   }
 }
