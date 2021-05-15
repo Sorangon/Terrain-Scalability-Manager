@@ -23,41 +23,28 @@ namespace TSM.Runtime {
         #endregion
 
         #region Callbacks
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        public static void OnInit() {
+            m_backedTerrainDatas = new Dictionary<TerrainData, TerrainData>(); ;
+        }
+
         [PostProcessScene]
         public static void OnPostProcessScene() {
             if (BuildPipeline.isBuildingPlayer) {
                 foreach (var tsm in FindObjectsOfType<TerrainScalabilityManager>()) {
                     if (tsm.m_TargetTerrain == null) continue;
-
+                   
                     TerrainScalabilitySetting targetSetting = tsm.GetPlatformSetting();
                     if (targetSetting == null) continue;
 
-                    TerrainData backedData = null;
-                    foreach (var btd in m_backedTerrainDatas) {
-                        if(tsm.m_TargetTerrain.terrainData == btd.Key) {
-                            backedData = btd.Value;
-                        }
+                    TerrainData backedData = tsm.GetScaledTerrainData(out bool alreadyInDatabase);
+
+                    if (!alreadyInDatabase) {
+                        tsm.ApplyTerrainDataScalability(backedData, targetSetting);
                     }
 
-                    if (backedData == null) {
-                        TerrainData sourceData = tsm.m_TargetTerrain.terrainData;
-                        backedData = Instantiate(sourceData);
-                        string suffix = "_Backed_" + EditorUserBuildSettings.activeBuildTarget;
-                        backedData.name += suffix;
-
-                        //Create terrain data asset
-                        if (AssetDatabase.Contains(sourceData)) {
-                            string sourceAssetPath = AssetDatabase.GetAssetPath(sourceData);
-                            string newAssetPath = sourceAssetPath.Substring(0, sourceAssetPath.Length - 6) + suffix + ".asset";
-                            AssetDatabase.CreateAsset(backedData, newAssetPath);
-                            AssetDatabase.ImportAsset(newAssetPath);
-                            m_backedTerrainDatas.Add(sourceData, backedData);
-                            tsm.ApplyTerrainDataScalability(backedData, targetSetting);
-                        }
-
-                        tsm.m_TargetTerrain.terrainData = backedData;
-                        tsm.ApplyTerrainScalability(targetSetting);
-                    }
+                    tsm.SetTerrainData(backedData);
+                    tsm.ApplyTerrainScalability(targetSetting);
                 }
             }
         }
@@ -66,11 +53,11 @@ namespace TSM.Runtime {
             m_TargetTerrain = GetComponent<Terrain>();
         }
 
-        private void Start() {
+        private void Awake() {
             TerrainScalabilitySetting targetSetting = GetPlatformSetting();
 
             if (targetSetting != null) {
-                m_TargetTerrain.terrainData = Instantiate(m_TargetTerrain.terrainData);
+                SetTerrainData(GetScaledTerrainData(out bool alreadyInDatabase));
 
                 ApplyTerrainDataScalability(m_TargetTerrain.terrainData, targetSetting);
                 ApplyTerrainScalability(targetSetting); 
@@ -166,6 +153,55 @@ namespace TSM.Runtime {
         #endregion
 
         #region Utility 
+        private void SetTerrainData(TerrainData data) {
+            m_TargetTerrain.terrainData = data;
+
+            //We get all terrain colliders to workaround the case where object has multiple colliders because of prefabs added components 
+            foreach (var collider in GetComponents<TerrainCollider>()) {
+                collider.terrainData = data;
+            }
+        }
+
+        private TerrainData GetScaledTerrainData(out bool alreadyInDatabase) {
+            TerrainData backedData = null;
+            alreadyInDatabase = false;
+
+            foreach (var btd in m_backedTerrainDatas) {
+                if (m_TargetTerrain.terrainData == btd.Key) {
+                    backedData = btd.Value;
+                    alreadyInDatabase = true;
+                    break;
+                }
+            }
+
+            if (backedData == null) {
+                TerrainData sourceData = m_TargetTerrain.terrainData;
+                string suffix = "_Generated_" + EditorUserBuildSettings.activeBuildTarget;
+
+                if (AssetDatabase.Contains(sourceData)) {
+                    string sourceAssetPath = AssetDatabase.GetAssetPath(sourceData);
+                    string newAssetPath = sourceAssetPath.Substring(0, sourceAssetPath.Length - 6) + suffix + ".asset";
+                    if (AssetDatabase.FindAssets(newAssetPath).Length <= 0) {
+                        if (!AssetDatabase.CopyAsset(sourceAssetPath, newAssetPath)) {
+                            Debug.LogError("Failed to copy " + sourceAssetPath);
+                        } else {
+                            backedData = AssetDatabase.LoadMainAssetAtPath(newAssetPath) as TerrainData;
+                        }
+                    } else {
+                        backedData = AssetDatabase.LoadMainAssetAtPath(newAssetPath) as TerrainData;
+                    }
+
+                    AssetDatabase.ImportAsset(newAssetPath);
+                    m_backedTerrainDatas.Add(sourceData, backedData);
+                } else {
+                    backedData = Instantiate(sourceData);
+                    backedData.name += suffix;
+                }
+            }
+
+            return backedData;
+        }
+
         //Random number generation, reference : https://thebookofshaders.com/11/?lan=fr
         private float RandomFloat(Vector2 coordinates) {
             return (((Mathf.Sin(Vector2.Dot(coordinates, new Vector2(12.9898f, 79.233f))) * 43758.5453123f) % 1) + 1.0f) * 0.5f;
